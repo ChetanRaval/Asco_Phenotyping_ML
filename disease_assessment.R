@@ -18,29 +18,61 @@ test <- image_import("./palette/test4.JPG")
 
 # pliman measure disease ####
 process_image_pliman <- function(image_file, out_folder, 
+                                 assess_disease=TRUE,
                                  trim_bottom=375, trim_top=0,  # crop dimensions 
                                  trim_left=400, trim_right=350,  # crop dimensions
                                  crop = TRUE, # crop image?
-                                 trans = TRUE, # remove background?
+                                 save_cropped = TRUE, # save cropped image?
+                                 trans = TRUE, # remove background? if yes we must save to a file!
                                  show=FALSE,   # show image?
-                                 h_pal, s_pal, b_pal){
-  plant_image <- image_import(image_file)
-  cropped_image <- plant_image
+                                 h_pal, s_pal, b_pal,
+                                 bg_color="transparent", 
+                                 reference="#F7F4EF", 
+                                 set_fuzz=30, 
+                                 start_point="+20+20"){
+  # image cropping
   if (isTRUE(crop)) {
-    if(!dir.exists(out_folder)) dir.create(out_folder) # create output folder if not exists
-    cropped_image <- pliman::image_trim(image = plant_image,
+    plant_image <- image_import(image_file)
+    processed_image <- pliman::image_trim(image = plant_image,
                                         bottom = trim_bottom,
                                         top = trim_top,
                                         left = trim_left,
                                         right = trim_right,
                                         plot = show) 
     image_basename <- tools::file_path_sans_ext(basename(image_file))
-    pliman::image_export(cropped_image, 
-                         file.path(out_folder, paste0(image_basename, "_cropped.jpg")))
+    
+    # save cropped file to file
+    if (isTRUE(save_cropped) | isTRUE(trans)) {
+      if (!dir.exists(out_folder)) dir.create(out_folder) # create output folder if not exists
+      # Reset image filename to the cropped one if we cropped
+      image_file <- file.path(out_folder, paste0(image_basename, "_cropped.jpg"))
+      pliman::image_export(processed_image, image_file)
+    }
+      
+       
+    
   }
+  if (isTRUE(trans)) {
+    if (!dir.exists(out_folder)) dir.create(out_folder)
+    image_base <- tools::file_path_sans_ext(basename(image_file))
+    input_img <- image_read(image_file)
+    # Reset image filename to the transparent one (must be png to be transparent!)
+    image_file <- file.path(out_folder, paste0(image_base, "_transparent.png"))
+    
+    magick::image_fill(input_img, 
+                       color = bg_color,
+                       refcolor = reference,
+                       fuzz = set_fuzz,
+                       point = start_point) %>% 
+      image_write(image_file, format = 'png') # (must be png to be transparent!)
+
+  }  
+  
+  if (!isTRUE(assess_disease)) return() # exit the function if disease assessment is not needed
   # pliman measure disease #
+  if (!exists("processed_image")) processed_image <- image_import(image_file)
   disease_assessment <- measure_disease(
-    img = cropped_image,
+    img = processed_image,
     img_healthy = h_pal,
     img_symptoms = s_pal,
     img_background = b_pal,
@@ -54,28 +86,101 @@ process_image_pliman <- function(image_file, out_folder,
   
 }
 
-# run the function for 1 image
-process_image_pliman(image_file = "./palette/test4.JPG", 
-                     out_folder = "input_images/cropped)", 
+# Tests ####
+
+# run the function for 1 image (only cropping)
+process_image_pliman(image_file = "./input_images/test4.JPG", 
+                     out_folder = "output/processed_images", 
+                     assess_disease = FALSE,
+                     trans = FALSE,
                      h_pal = h, s_pal = s, b_pal = b)
 
-# run the function for all images in folder (make it parallel and with progress bar with furrr)
+# run the function for 1 image (only cropping, no saving file)
+process_image_pliman(image_file = "./input_images/test4.JPG", 
+                     out_folder = "output/processed_images", 
+                     assess_disease = FALSE,
+                     save_cropped = FALSE,
+                     trans = FALSE,
+                     h_pal = h, s_pal = s, b_pal = b)
 
-image_files <- list.files("input_images/", ".jpg", full.names = TRUE)
+# run the function for 1 image (cropping and assessing)
+process_image_pliman(image_file = "./input_images/test4.JPG", 
+                     out_folder = "output/processed_images", 
+                     assess_disease = TRUE,
+                     save_cropped = FALSE,
+                     trans = FALSE,
+                     h_pal = h, s_pal = s, b_pal = b)
+
+# run the function for 1 image (just removing background)
+process_image_pliman(image_file = "./input_images/test4.JPG", 
+                     out_folder = "output/processed_images", 
+                     assess_disease = FALSE,
+                     crop = FALSE, 
+                     save_cropped = FALSE,
+                     trans = TRUE,
+                     h_pal = h, s_pal = s, b_pal = b)
+
+# run the function for 1 image (trans and assessing)
+process_image_pliman(image_file = "./input_images/test4.JPG", 
+                     out_folder = "output/processed_images", 
+                     assess_disease = TRUE,
+                     crop = FALSE, 
+                     save_cropped = FALSE,
+                     trans = TRUE,
+                     h_pal = h, s_pal = s, b_pal = b)
+
+# run the function for 1 image (removing background and cropping)
+process_image_pliman(image_file = "./input_images/test4.JPG", 
+                     out_folder = "output/processed_images", 
+                     assess_disease = FALSE,
+                     crop = TRUE, 
+                     save_cropped = FALSE, # should save the cropped file even if FALSE!
+                     trans = TRUE,
+                     h_pal = h, s_pal = s, b_pal = b)
+
+# run the function for 1 image (removing background, cropping and assessing)
+process_image_pliman(image_file = "./input_images/test4.JPG", 
+                     out_folder = "output/processed_images", 
+                     assess_disease = TRUE,
+                     crop = TRUE, 
+                     save_cropped = FALSE, # should save the cropped file even if FALSE!
+                     trans = TRUE,
+                     h_pal = h, s_pal = s, b_pal = b)
+
+# run the function for 1 image (only assessing)
+process_image_pliman(image_file = "./input_images/test4.JPG", 
+                     out_folder = "output/processed_images", 
+                     assess_disease = TRUE,
+                     crop = FALSE, 
+                     save_cropped = FALSE, # should save the cropped file even if FALSE!
+                     trans = FALSE,
+                     h_pal = h, s_pal = s, b_pal = b)
+
+
+# run the function for 5 images in folder (make it parallel and with progress bar with furrr)
+
+image_files <- list.files("input_images/", ".jpg", full.names = TRUE)[1:5]
+
+tic() # start timer
 with_progress({
-  p <- progressor(steps = 5) # length(image_files)
+  p <- progressor(steps = length(image_files)) # 
   
-  disease_assessment_table <- image_files[1:5] %>% 
+  disease_assessment_table <- image_files %>% 
     future_map_dfr(.f = ~{
-      process_image_pliman(image_file = .x, out_folder = "input_images/cropped",
-                           crop = TRUE, h_pal = h, s_pal = s, b_pal = b)
+      process_image_pliman(image_file = .x, 
+                           out_folder = "output/processed_images", 
+                           assess_disease = TRUE,
+                           crop = TRUE, 
+                           save_cropped = TRUE, # should save the cropped file even if FALSE!
+                           trans = TRUE,
+                           h_pal = h, s_pal = s, b_pal = b)
       p()
     })
 })
+toc() # end timer
 
 
-
-#create transparent image ####
+# create transparent image ####
 
 #use list.files to import all images from input_images/cropped
 #use map() function to import all images into a list
@@ -142,8 +247,8 @@ toc()
 
 write_csv(disease_assessment_table, "input_images/disease_assessment_table.csv")
 
-
-leaf <- image_import("output/test4cropped.jpg")
+# object contour ####
+leaf <- image_import("output/test4_cropped.jpg")
 cont <- object_contour(leaf, watershed = TRUE, show_image = FALSE)
 
 plot(leaf)
@@ -151,17 +256,9 @@ plot_contour(cont, col = "red", lwd = 3)
 
 # MAGICK ####
 
-crop_test <- image_read("./palette/test4.JPG")
+crop_test <- image_read("input_images/test4.JPG")
 
-# trim image to usable area
-trimmed_image <- image_crop(crop_test, "5250x3625+400+0")
+# trim image to usable area (with magick)
+trimmed_image <- magick::image_crop(crop_test, "5250x3625+400+0")
 
-# pliman measure disease ####
 
-measure_disease(
-  img = trimmed_image,
-  img_healthy = h,
-  img_symptoms = s,
-  img_background = b,
-  show_image = TRUE
-)
