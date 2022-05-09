@@ -1,28 +1,33 @@
-library(pliman)
-library(magick)
-library(tidyverse)
-library(furrr)
-library(progressr)
-library(EBImage)
-
+# install/load packages in one-liner
+library(pacman)
+# load/install from GitHub repos
+p_load_current_gh(char = c("TiagoOlivoto/pliman", 
+                           "DavisVaughan/furrr", 
+                           "HenrikBengtsson/progressr" ))
+# load/install from CRAN/BioConductor
+p_load(tidyverse, magick, tictoc)
 h <- image_import("./palette/h.png")
 s <- image_import("./palette/s.png")
 b <- image_import("./palette/b.JPEG")
 
 plan(multisession, workers = 6)
 
-#PLIMAN####
+# PLIMAN ####
 test <- image_import("./palette/test4.JPG")
 # image_combine(test, h, s, b)
 
-process_image_pliman <- function(image_file, out_folder, trim_bottom=375, trim_top=0, trim_left=400, 
-                                 trim_right=350,
-                                 crop = TRUE,
-                                 show=FALSE, h_pal, s_pal, b_pal){
+# pliman measure disease ####
+process_image_pliman <- function(image_file, out_folder, 
+                                 trim_bottom=375, trim_top=0,  # crop dimensions 
+                                 trim_left=400, trim_right=350,  # crop dimensions
+                                 crop = TRUE, # crop image?
+                                 trans = TRUE, # remove background?
+                                 show=FALSE,   # show image?
+                                 h_pal, s_pal, b_pal){
   plant_image <- image_import(image_file)
   cropped_image <- plant_image
   if (isTRUE(crop)) {
-    if(!dir.exists(out_folder)) dir.create(out_folder)
+    if(!dir.exists(out_folder)) dir.create(out_folder) # create output folder if not exists
     cropped_image <- pliman::image_trim(image = plant_image,
                                         bottom = trim_bottom,
                                         top = trim_top,
@@ -30,13 +35,10 @@ process_image_pliman <- function(image_file, out_folder, trim_bottom=375, trim_t
                                         right = trim_right,
                                         plot = show) 
     image_basename <- tools::file_path_sans_ext(basename(image_file))
-    pliman::image_export(cropped_image, file.path(out_folder, paste0(image_basename, "_cropped.jpg")))
-    
-    
-    
+    pliman::image_export(cropped_image, 
+                         file.path(out_folder, paste0(image_basename, "_cropped.jpg")))
   }
-  
-  
+  # pliman measure disease #
   disease_assessment <- measure_disease(
     img = cropped_image,
     img_healthy = h_pal,
@@ -53,7 +55,9 @@ process_image_pliman <- function(image_file, out_folder, trim_bottom=375, trim_t
 }
 
 # run the function for 1 image
-process_image_pliman(image_file = "./palette/test4.JPG", h_pal = h, s_pal = s, b_pal = b)
+process_image_pliman(image_file = "./palette/test4.JPG", 
+                     out_folder = "input_images/cropped)", 
+                     h_pal = h, s_pal = s, b_pal = b)
 
 # run the function for all images in folder (make it parallel and with progress bar with furrr)
 
@@ -77,46 +81,62 @@ with_progress({
 #use map() function to import all images into a list
 #pass that object into input_folder or input_images
 
-create_trans_img <- function(input_img, output_folder, bg_color="transparent", 
+create_trans_img <- function(input_img_file, output_folder="input_images/trans", 
+                             bg_color="transparent", 
                              reference="#F7F4EF", 
-                             set_fuzz=25, 
+                             set_fuzz=30, 
+                             # trans=TRUE,
                              start_point="+20+20"){
+  # read image from file and strip its directory and extension
+  input_img <- image_read(input_img_file)
+  image_base <- tools::file_path_sans_ext(basename(input_img_file))
   
-  transparent_img <- image_read(input_img)
-  trans_img <- transparent_img
+  # if (isTRUE(trans)) {
+  if(!dir.exists(output_folder)) dir.create(output_folder)
   
-  image_base <- tools::file_path_sans_ext(basename(input_img))
-  
-  
-  trans_image <- magick::image_fill(transparent_img, 
+  # }
+  trans_image <- magick::image_fill(input_img, 
                             color = bg_color,
                             refcolor = reference,
                             fuzz = set_fuzz,
                             point = start_point) %>% 
-    image_write(paste(output_folder, image_base, "_transparent.jpg", sep = ""))
+    image_write(file.path(output_folder, paste0(image_base, "_transparent.png")),
+                format = 'png') # this is where you had the error, you need to paste the output_folder to the file name with a / separator (or use file.path function to do it for you like I've done)
+  # return(trans_image)
     
 }
 
 #run function for 1 image
-create_trans_img("palette/test4.JPG", output_folder = "output/")
+create_trans_img("palette/test4.JPG", output_folder = "input_images/trans")
 
-magick_images <- list.files("input_images/cropped/", ".jpg", full.names = TRUE)
+magick_images <- list.files("input_images", "_cropped.jpg", full.names = TRUE)[1:10]
+
+# measure the time when run serially
+tic()
+magick_images %>% walk(.f = ~create_trans_img(input_img_file = .x, 
+                                              output_folder = "input_images/trans"))
+toc() 
+# measure the time in parallel (with furrr)
+tic()
 with_progress({
-  
-  p <- progressor(steps = 5)
-  
-  create_trans_img(input_img = , output_folder = "output")
-  
-  p()
-  
-})
 
+  p <- progressor(steps = length(magick_images))
+
+  magick_images %>% future_walk(.f = ~{
+    create_trans_img(input_img_file = .x,
+                     output_folder = "input_images/trans")
+
+  p()
+  }, .options = furrr_options(seed = 123))
+
+})
+toc()
 
 #test image_fill()
-test_image <- image_read("./palette/test4.JPG")
-trans_img <- image_fill(test_image, color = "transparent", refcolor = "#F7F4EF", fuzz = 25, 
-                        point = "+20+20") %>%
-  image_write("output/transparent_image.jpg")
+# test_image <- image_read("./palette/test4.JPG")
+# trans_img <- image_fill(input_img, color = "transparent", refcolor = "#F7F4EF", fuzz = 30, 
+#                         point = "+20+20") %>%
+#   image_write("output/transparent_image.jpg")
 
 # write results to file
 
