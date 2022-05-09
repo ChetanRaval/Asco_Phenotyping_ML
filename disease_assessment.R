@@ -77,7 +77,6 @@ with_progress({
 #use map() function to import all images into a list
 #pass that object into input_folder or input_images
 
-
 create_trans_img <- function(input_img, output_folder, bg_color="transparent", 
                              reference="#F7F4EF", 
                              set_fuzz=25, 
@@ -86,23 +85,20 @@ create_trans_img <- function(input_img, output_folder, bg_color="transparent",
   transparent_img <- image_read(input_img)
   trans_img <- transparent_img
   
+  image_base <- tools::file_path_sans_ext(basename(input_img))
+  
+  
   trans_image <- magick::image_fill(transparent_img, 
                             color = bg_color,
                             refcolor = reference,
                             fuzz = set_fuzz,
-                            point = start_point)
+                            point = start_point) %>% 
+    image_write(paste(output_folder, image_base, "_transparent.jpg", sep = ""))
     
-    #image_base <- tools::file_path_sans_ext(basename(input_img))
-    #pliman::image_export(trans_image, file.path(output_folder, paste0(image_base, "_transparent.jpg")))
-    
-    image_write(image = trans_image, path = output_folder)
-
 }
 
-
-
 #run function for 1 image
-create_trans_img("palette/test4.JPG", output_folder = "./output/")
+create_trans_img("palette/test4.JPG", output_folder = "output/")
 
 magick_images <- list.files("input_images/cropped/", ".jpg", full.names = TRUE)
 with_progress({
