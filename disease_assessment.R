@@ -99,7 +99,12 @@ create_trans_img <- function(input_img, output_folder, bg_color="transparent",
     #EBImage::writeImage(trans_img, file.path(output_folder, paste0(image_base, "_transparent.jpg")))
     #EBImage::writeImage(trans_image, output_folder)
     
+    #error when attemtping to export image: 
+    #  Error in validImage(x) : object must be an array 
+    
 }
+
+
 
 #run function for 1 image
 create_trans_img("palette/test4.JPG", output_folder = "output")
