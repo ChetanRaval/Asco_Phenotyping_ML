@@ -86,28 +86,23 @@ create_trans_img <- function(input_img, output_folder, bg_color="transparent",
   transparent_img <- image_read(input_img)
   trans_img <- transparent_img
   
-  
-  
   trans_image <- magick::image_fill(transparent_img, 
                             color = bg_color,
                             refcolor = reference,
                             fuzz = set_fuzz,
                             point = start_point)
     
-    image_base <- tools::file_path_sans_ext(basename(input_img))
-    pliman::image_export(trans_img, file.path(output_folder, paste0(image_base, "_transparent.jpg")))
-    #EBImage::writeImage(trans_img, file.path(output_folder, paste0(image_base, "_transparent.jpg")))
-    #EBImage::writeImage(trans_image, output_folder)
+    #image_base <- tools::file_path_sans_ext(basename(input_img))
+    #pliman::image_export(trans_image, file.path(output_folder, paste0(image_base, "_transparent.jpg")))
     
-    #error when attemtping to export image: 
-    #  Error in validImage(x) : object must be an array 
-    
+    image_write(image = trans_image, path = output_folder)
+
 }
 
 
 
 #run function for 1 image
-create_trans_img("palette/test4.JPG", output_folder = "output")
+create_trans_img("palette/test4.JPG", output_folder = "./output/")
 
 magick_images <- list.files("input_images/cropped/", ".jpg", full.names = TRUE)
 with_progress({
@@ -125,7 +120,7 @@ with_progress({
 test_image <- image_read("./palette/test4.JPG")
 trans_img <- image_fill(test_image, color = "transparent", refcolor = "#F7F4EF", fuzz = 25, 
                         point = "+20+20") %>%
-  image_write("output/")
+  image_write("output/transparent_image.jpg")
 
 # write results to file
 
