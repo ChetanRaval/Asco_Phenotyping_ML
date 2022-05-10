@@ -157,7 +157,7 @@ process_image_pliman(image_file = "./input_images/test4.JPG",
                      h_pal = h, s_pal = s, b_pal = b)
 
 
-# run the function for 5 images in folder (make it parallel and with progress bar with furrr)
+# run the function for 5 images in folder
 
 image_files <- list.files("input_images/", ".jpg", full.names = TRUE)[1:5]
 
@@ -178,6 +178,17 @@ with_progress({
     })
 })
 toc() # end timer
+# 73 sec
+
+
+# measure disease assessment when run serially
+tic()
+disease_assessment_table <- image_files %>% walk(.f = ~process_image_pliman(image_file = .x,
+                                                out_folder = "output/processed_images",
+                                                assess_disease = TRUE,
+                                                h_pal = h, s_pal = s, b_pal = b))
+toc()
+# 132 sec
 
 
 # create transparent image ####
@@ -221,6 +232,7 @@ tic()
 magick_images %>% walk(.f = ~create_trans_img(input_img_file = .x, 
                                               output_folder = "input_images/trans"))
 toc() 
+
 # measure the time in parallel (with furrr)
 tic()
 with_progress({
@@ -236,6 +248,8 @@ with_progress({
 
 })
 toc()
+
+
 
 #test image_fill()
 # test_image <- image_read("./palette/test4.JPG")
