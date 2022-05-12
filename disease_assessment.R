@@ -1,11 +1,12 @@
 # install/load packages in one-liner
 library(pacman)
+library(EBImage)
 # load/install from GitHub repos
 p_load_current_gh(char = c("TiagoOlivoto/pliman", 
                            "DavisVaughan/furrr", 
                            "HenrikBengtsson/progressr" ))
 # load/install from CRAN/BioConductor
-p_load(tidyverse, magick, tictoc)
+p_load(tidyverse, magick, tictoc, jpeg)
 h <- image_import("./palette/h.png")
 s <- image_import("./palette/s.png")
 b <- image_import("./palette/b.JPEG")
@@ -13,7 +14,7 @@ b <- image_import("./palette/b.JPEG")
 plan(multisession, workers = 6)
 
 # PLIMAN ####
-test <- image_import("./palette/test4.JPG")
+test <- image_import("input_images/test4.JPG")
 # image_combine(test, h, s, b)
 
 # pliman measure disease ####
@@ -29,7 +30,8 @@ process_image_pliman <- function(image_file, out_folder,
                                  bg_color="transparent", 
                                  reference="#F7F4EF", 
                                  set_fuzz=30, 
-                                 start_point="+20+20"){
+                                 start_point="+20+20",
+                                 crop_area = "200x200+0"){
   # image cropping
   if (isTRUE(crop)) {
     plant_image <- image_import(image_file)
@@ -59,6 +61,7 @@ process_image_pliman <- function(image_file, out_folder,
     # Reset image filename to the transparent one (must be png to be transparent!)
     image_file <- file.path(out_folder, paste0(image_base, "_transparent.png"))
     
+    
     magick::image_fill(input_img, 
                        color = bg_color,
                        refcolor = reference,
@@ -80,18 +83,64 @@ process_image_pliman <- function(image_file, out_folder,
   )
   
   
+  
+  
   return(as_tibble(disease_assessment$severity) %>% mutate(filename=basename(image_file)) %>% 
            relocate(filename, .before = "healthy"))
   
+}
+
+
+bioassay_test <- list.files("bioassay_test/test/", ".JPG", full.names = TRUE)
+
+tic() # start timer
+with_progress({
+  p <- progressor(steps = length(bioassay_test)) # 
+  disease_assessment_table <- bioassay_test %>% 
+    map(.f = ~{
+      process_image_pliman(image_file = .x, 
+                           out_folder = "bioassay_test/output/", 
+                           assess_disease = TRUE,
+                           crop = TRUE, 
+                           trim_bottom=300, trim_top=0,
+                           trim_left=400, trim_right=275,
+                           save_cropped = TRUE,
+                           trans = TRUE,
+                           set_fuzz = 28,
+                           h_pal = h, s_pal = s, b_pal = b)
+      p()
+      
+    }) 
+})
+toc()
+
+
+# get average colour for transparent reference colour argument
+
+avg_bgcolor <- function(image_file, crop_area="200x200+0"){
+  
+  sample <- image_read(image_file)
+  crop <- magick::image_crop(sample, crop_area) %>% 
+    image_write("output/sample.jpeg")
+  cropped_sample <- jpeg::readJPEG("output/sample.jpeg")
+  
+  red <- mean(c(cropped_sample[,,1])) # mean of all red colour channels
+  green <- mean(c(cropped_sample[,,2])) # mean of all green colour channels
+  blue <- mean(c(cropped_sample[,,3])) # mean of all blue colour channels
+   
+  return(avg_hex <- rgb(red, green, blue))
   
 }
+
+avg_bgcolor("input_images/T001_POT43_PL1_00002_cropped.jpg")
+
 
 # Tests ####
 
 # run the function for 1 image (only cropping)
 process_image_pliman(image_file = "./input_images/test4.JPG", 
                      out_folder = "output/processed_images", 
-                     assess_disease = FALSE,
+                     assess_disease = TRUE,
                      trans = FALSE,
                      h_pal = h, s_pal = s, b_pal = b)
 
@@ -110,7 +159,6 @@ process_image_pliman(image_file = "./input_images/test4.JPG",
                      save_cropped = FALSE,
                      trans = FALSE,
                      h_pal = h, s_pal = s, b_pal = b)
-
 # run the function for 1 image (just removing background)
 process_image_pliman(image_file = "./input_images/test4.JPG", 
                      out_folder = "output/processed_images", 
@@ -259,7 +307,7 @@ toc()
 
 # write results to file
 
-write_csv(disease_assessment_table, "input_images/disease_assessment_table.csv")
+write_csv(disease_assessment_table, "bioassay_test/disease_assessment_table.csv")
 
 # object contour ####
 leaf <- image_import("output/test4_cropped.jpg")
