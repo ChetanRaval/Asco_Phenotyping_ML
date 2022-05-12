@@ -128,7 +128,7 @@ avg_bgcolor <- function(image_file, crop_area="200x200+0"){
   green <- mean(c(cropped_sample[,,2])) # mean of all green colour channels
   blue <- mean(c(cropped_sample[,,3])) # mean of all blue colour channels
    
-  return(avg_hex <- rgb(red, green, blue))
+  return(rgb(red, green, blue))
   
 }
 
