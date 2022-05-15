@@ -1,3 +1,6 @@
+# TODO
+# Read in phenotyping data from SharePoint and attach isolate and host information for each pot
+
 # install/load packages in one-liner
 library(pacman)
 # load/install from GitHub repos
@@ -10,7 +13,7 @@ h <- image_import("./palette/h.png")
 s <- image_import("./palette/s.png")
 b <- image_import("./palette/b.JPEG")
 
-plan(multisession, workers = 3)
+plan(multisession, workers = future::availableCores()-1 ) # automatically detect available cores
 
 # PLIMAN ####
 test <- image_import("input_images/test4.JPG")
@@ -108,29 +111,6 @@ process_image_pliman <- function(image_file, out_folder,
 
 }
 
-bioassay_test <- list.files("bioassay_test/test/", ".JPG", full.names = TRUE)
-
-tic() # start timer
-with_progress({
-  p <- progressor(steps = length(bioassay_test)) # 
-  disease_assessment_table <- bioassay_test %>% 
-    map_dfr(.f = ~{
-      process_image_pliman(image_file = .x, 
-                           out_folder = "bioassay_test/output/", 
-                           assess_disease = TRUE,
-                           crop = TRUE, 
-                           trim_bottom=300, trim_top=0,
-                           trim_left=400, trim_right=275,
-                           save_cropped = TRUE,
-                           trans = TRUE,
-                           set_fuzz = 28,
-                           h_pal = h, s_pal = s, b_pal = b)
-      p()
-      
-    }) 
-})
-toc()
-
 # Tests ####
 
 # run the function for 1 image (only cropping)
@@ -203,40 +183,50 @@ process_image_pliman(image_file = "./input_images/test4.JPG",
 
 # run the function for 5 images in folder
 
-# image_files <- list.files("input_images/", ".jpg", full.names = TRUE)[1:5]
-image_files <- list.files("input_images/", "test", full.names = TRUE)
+bioassay_test <- list.files("bioassay_test/test/", ".JPG", full.names = TRUE)
 
 tic() # start timer
 with_progress({
-  p <- progressor(steps = length(image_files)) # 
-  
-  disease_assessment_table <- image_files %>% 
+  p <- progressor(steps = length(bioassay_test)) # 
+  disease_assessment_table <- bioassay_test %>% 
     future_map_dfr(.f = ~{
       res_tibble <- process_image_pliman(image_file = .x, 
-                           out_folder = "output/processed_images", 
-                           assess_disease = TRUE,
-                           crop = FALSE, 
-                           save_cropped = TRUE, # should save the cropped file even if FALSE!
-                           trans = TRUE,
-                           h_pal = h, s_pal = s, b_pal = b)
+                                         out_folder = "bioassay_test/output/", 
+                                         assess_disease = TRUE,
+                                         crop = TRUE, 
+                                         trim_bottom=300, trim_top=0,
+                                         trim_left=400, trim_right=275,
+                                         save_cropped = TRUE,
+                                         trans = TRUE,
+                                         set_fuzz = 28,
+                                         reference="200x200+0",
+                                         h_pal = h, s_pal = s, b_pal = b)
       p() # because we put this last in the future_map_dfr, the function returned the progressor step instead of the tibble!
       return(res_tibble) # this should fix it...
     }, .options = furrr_options(seed = TRUE)) # this removes the annoying warning about the seed (though I don'tthink we're generating any random numbers)
 })
-toc() # end timer
+toc()
+
 # 73 sec
 
-
-# measure disease assessment when run serially 
+# measure disease assessment when run serially (quicker in parallel for a large number of images)
 # if we expect the output as a dataframe/tibble built row-by-row we need to use map_dfr()
 # if there's no expected output we need to use walk() - I changed it now so that we always get a tibble output, even if not assessing
-tic()
-disease_assessment_table <- image_files %>% map_dfr(.f = ~process_image_pliman(image_file = .x,
-                                                out_folder = "output/processed_images",
-                                                assess_disease = TRUE,
-                                                h_pal = h, s_pal = s, b_pal = b))
-toc()
+# tic()
+# disease_assessment_table <- image_files %>% map_dfr(.f = ~process_image_pliman(image_file = .x,
+#                                                                                out_folder = "output/processed_images",
+#                                                                                assess_disease = TRUE,
+#                                                                                h_pal = h, s_pal = s, b_pal = b))
+# toc()
 # 132 sec
+
+# process disease assessment results ####
+disease_assessment_table %>% # check results and extract metadata from filename
+  mutate(meta_string=tools::file_path_sans_ext(basename(original_file))) %>% 
+  separate(meta_string, into = c("bioassay", "pot", "plant", "replicate")) %>% 
+  mutate(pot=as.integer(sub("POT", "", pot, ignore.case = TRUE)), plant=as.integer(sub("PL", "", plant, ignore.case = TRUE)))
+
+
 
 
 # Process an entire folder of images #####

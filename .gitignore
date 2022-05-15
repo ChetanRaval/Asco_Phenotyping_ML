@@ -4,3 +4,4 @@
 .Ruserdata
 output/**/*.png
 output/**/*.jpg
+**/.DS_Store
