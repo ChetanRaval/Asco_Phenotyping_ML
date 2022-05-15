@@ -28,8 +28,8 @@ process_image_pliman <- function(image_file, out_folder,
                                  show=FALSE,   # show image?
                                  h_pal, s_pal, b_pal,
                                  bg_color="transparent", 
-                                 reference="#F7F4EF", 
-                                 set_fuzz=30, 
+                                 reference="#F7F4EF",
+                                 set_fuzz=27, 
                                  start_point="+20+20",
                                  crop_area = "200x200+0"){
   # image cropping
@@ -82,14 +82,11 @@ process_image_pliman <- function(image_file, out_folder,
     show_image = show
   )
   
-  
-  
-  
+
   return(as_tibble(disease_assessment$severity) %>% mutate(filename=basename(image_file)) %>% 
            relocate(filename, .before = "healthy"))
   
 }
-
 
 bioassay_test <- list.files("bioassay_test/test/", ".JPG", full.names = TRUE)
 
@@ -114,26 +111,28 @@ with_progress({
 })
 toc()
 
+# get avg bg color ####
 
-# get average colour for transparent reference colour argument
+# place into process_image_pliman
+# if reference == "auto"
+# set refcolor in image_fill to output of avg_bgcolor
 
 avg_bgcolor <- function(image_file, crop_area="200x200+0"){
   
-  sample <- image_read(image_file)
-  crop <- magick::image_crop(sample, crop_area) %>% 
+  sample <- image_read(image_file) # this step to be omitted in main function
+  bg_ref_crop <- magick::image_crop(sample, crop_area) %>% 
     image_write("output/sample.jpeg")
-  cropped_sample <- jpeg::readJPEG("output/sample.jpeg")
-  
+  # need to read cropped image w 'jpeg' to get RGB information
+  cropped_sample <- jpeg::readJPEG("output/sample.jpeg") 
+ 
   red <- mean(c(cropped_sample[,,1])) # mean of all red colour channels
   green <- mean(c(cropped_sample[,,2])) # mean of all green colour channels
   blue <- mean(c(cropped_sample[,,3])) # mean of all blue colour channels
    
   return(rgb(red, green, blue))
-  
 }
 
-avg_bgcolor("input_images/T001_POT43_PL1_00002_cropped.jpg")
-
+avg_bgcolor("./input_images/T001_POT22_PL5_00002_cropped.jpg")
 
 # Tests ####
 
