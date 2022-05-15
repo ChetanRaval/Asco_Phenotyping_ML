@@ -1,21 +1,37 @@
 # install/load packages in one-liner
 library(pacman)
-library(EBImage)
 # load/install from GitHub repos
 p_load_current_gh(char = c("TiagoOlivoto/pliman", 
                            "DavisVaughan/furrr", 
                            "HenrikBengtsson/progressr" ))
 # load/install from CRAN/BioConductor
-p_load(tidyverse, magick, tictoc, jpeg)
+p_load(tidyverse, magick, tictoc, jpeg, EBImage)
 h <- image_import("./palette/h.png")
 s <- image_import("./palette/s.png")
 b <- image_import("./palette/b.JPEG")
 
-plan(multisession, workers = 6)
+plan(multisession, workers = 3)
 
 # PLIMAN ####
 test <- image_import("input_images/test4.JPG")
 # image_combine(test, h, s, b)
+
+# get average colour for transparent reference colour argument
+
+avg_bgcolor <- function(image_file, ref_area="200x200+0"){
+  # image_file="input_images/test4.JPG"
+  sample <- image_read(image_file)
+  crop <- magick::image_crop(sample, ref_area) 
+  crop_array <- as.integer(crop[[1]]) # no need to write to disk and read again, it's very inefficient, see https://stackoverflow.com/a/46736582/5346827
+  # dim(crop_array)
+  red <- mean(crop_array[,,1]) # mean of all red colour channels
+  green <- mean(crop_array[,,2]) # mean of all green colour channels
+  blue <- mean(crop_array[,,3]) # mean of all blue colour channels
+  
+  return(rgb(red, green, blue, maxColorValue = 255))
+  
+}
+
 
 # pliman measure disease ####
 process_image_pliman <- function(image_file, out_folder, 
@@ -28,10 +44,10 @@ process_image_pliman <- function(image_file, out_folder,
                                  show=FALSE,   # show image?
                                  h_pal, s_pal, b_pal,
                                  bg_color="transparent", 
-                                 reference="#F7F4EF", 
+                                 reference="200x200+0", 
                                  set_fuzz=30, 
-                                 start_point="+20+20",
-                                 crop_area = "200x200+0"){
+                                 start_point="+20+20"){
+  original_file <- image_file
   # image cropping
   if (isTRUE(crop)) {
     plant_image <- image_import(image_file)
@@ -58,10 +74,10 @@ process_image_pliman <- function(image_file, out_folder,
     if (!dir.exists(out_folder)) dir.create(out_folder)
     image_base <- tools::file_path_sans_ext(basename(image_file))
     input_img <- image_read(image_file)
+    # calculate reference background colour (if defined as region)
+    if (!grepl("^#\\w{6}", reference)) reference <- avg_bgcolor(image_file = image_file, ref_area = reference)
     # Reset image filename to the transparent one (must be png to be transparent!)
     image_file <- file.path(out_folder, paste0(image_base, "_transparent.png"))
-    
-    
     magick::image_fill(input_img, 
                        color = bg_color,
                        refcolor = reference,
@@ -70,8 +86,11 @@ process_image_pliman <- function(image_file, out_folder,
       image_write(image_file, format = 'png') # (must be png to be transparent!)
 
   }  
+  # save results as a row in a tibble
+  results <- tibble(original_file=original_file, processed_file=ifelse(original_file==image_file, NA, image_file), 
+                    cropped=crop, save_cropped = save_cropped,  remove_bg=trans, disease_assessed=assess_disease)
   
-  if (!isTRUE(assess_disease)) return() # exit the function if disease assessment is not needed
+  if (!isTRUE(assess_disease)) return(results) # exit the function if disease assessment is not needed
   # pliman measure disease #
   if (!exists("processed_image")) processed_image <- image_import(image_file)
   disease_assessment <- measure_disease(
@@ -83,10 +102,7 @@ process_image_pliman <- function(image_file, out_folder,
   )
   
   
-  
-  
-  return(as_tibble(disease_assessment$severity) %>% mutate(filename=basename(image_file)) %>% 
-           relocate(filename, .before = "healthy"))
+  return(bind_cols(results, as_tibble(disease_assessment$severity)))
   
 }
 
@@ -97,7 +113,7 @@ tic() # start timer
 with_progress({
   p <- progressor(steps = length(bioassay_test)) # 
   disease_assessment_table <- bioassay_test %>% 
-    map(.f = ~{
+    map_dfr(.f = ~{
       process_image_pliman(image_file = .x, 
                            out_folder = "bioassay_test/output/", 
                            assess_disease = TRUE,
@@ -115,22 +131,6 @@ with_progress({
 toc()
 
 
-# get average colour for transparent reference colour argument
-
-avg_bgcolor <- function(image_file, crop_area="200x200+0"){
-  
-  sample <- image_read(image_file)
-  crop <- magick::image_crop(sample, crop_area) %>% 
-    image_write("output/sample.jpeg")
-  cropped_sample <- jpeg::readJPEG("output/sample.jpeg")
-  
-  red <- mean(c(cropped_sample[,,1])) # mean of all red colour channels
-  green <- mean(c(cropped_sample[,,2])) # mean of all green colour channels
-  blue <- mean(c(cropped_sample[,,3])) # mean of all blue colour channels
-   
-  return(rgb(red, green, blue))
-  
-}
 
 avg_bgcolor("input_images/T001_POT43_PL1_00002_cropped.jpg")
 
@@ -140,7 +140,7 @@ avg_bgcolor("input_images/T001_POT43_PL1_00002_cropped.jpg")
 # run the function for 1 image (only cropping)
 process_image_pliman(image_file = "./input_images/test4.JPG", 
                      out_folder = "output/processed_images", 
-                     assess_disease = TRUE,
+                     assess_disease = FALSE,
                      trans = FALSE,
                      h_pal = h, s_pal = s, b_pal = b)
 
@@ -207,7 +207,8 @@ process_image_pliman(image_file = "./input_images/test4.JPG",
 
 # run the function for 5 images in folder
 
-image_files <- list.files("input_images/", ".jpg", full.names = TRUE)[1:5]
+# image_files <- list.files("input_images/", ".jpg", full.names = TRUE)[1:5]
+image_files <- list.files("input_images/", "test", full.names = TRUE)
 
 tic() # start timer
 with_progress({
@@ -215,28 +216,41 @@ with_progress({
   
   disease_assessment_table <- image_files %>% 
     future_map_dfr(.f = ~{
-      process_image_pliman(image_file = .x, 
+      res_tibble <- process_image_pliman(image_file = .x, 
                            out_folder = "output/processed_images", 
                            assess_disease = TRUE,
-                           crop = TRUE, 
+                           crop = FALSE, 
                            save_cropped = TRUE, # should save the cropped file even if FALSE!
                            trans = TRUE,
                            h_pal = h, s_pal = s, b_pal = b)
-      p()
-    })
+      p() # because we put this last in the future_map_dfr, the function returned the progressor step instead of the tibble!
+      return(res_tibble) # this should fix it...
+    }, .options = furrr_options(seed = TRUE)) # this removes the annoying warning about the seed (though I don'tthink we're generating any random numbers)
 })
 toc() # end timer
 # 73 sec
 
 
-# measure disease assessment when run serially
+# measure disease assessment when run serially 
+# if we expect the output as a dataframe/tibble built row-by-row we need to use map_dfr()
+# if there's no expected output we need to use walk() - I changed it now so that we always get a tibble output, even if not assessing
 tic()
-disease_assessment_table <- image_files %>% walk(.f = ~process_image_pliman(image_file = .x,
+disease_assessment_table <- image_files %>% map_dfr(.f = ~process_image_pliman(image_file = .x,
                                                 out_folder = "output/processed_images",
                                                 assess_disease = TRUE,
                                                 h_pal = h, s_pal = s, b_pal = b))
 toc()
 # 132 sec
+
+
+# Process an entire folder of images #####
+# make sure to test the fuzz and crop area parameters on a few files before! 
+
+
+
+
+
+
 
 
 # create transparent image ####
