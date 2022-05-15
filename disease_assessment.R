@@ -16,8 +16,8 @@ plan(multisession, workers = 3)
 test <- image_import("input_images/test4.JPG")
 # image_combine(test, h, s, b)
 
+# get avg bg color ####
 # get average colour for transparent reference colour argument
-
 avg_bgcolor <- function(image_file, ref_area="200x200+0"){
   # image_file="input_images/test4.JPG"
   sample <- image_read(image_file)
@@ -32,6 +32,8 @@ avg_bgcolor <- function(image_file, ref_area="200x200+0"){
   
 }
 
+# test function
+avg_bgcolor("./input_images/T001_POT22_PL5_00002_cropped.jpg")
 
 # pliman measure disease ####
 process_image_pliman <- function(image_file, out_folder, 
@@ -48,6 +50,7 @@ process_image_pliman <- function(image_file, out_folder,
                                  set_fuzz=30, 
                                  start_point="+20+20"){
   original_file <- image_file
+
   # image cropping
   if (isTRUE(crop)) {
     plant_image <- image_import(image_file)
@@ -101,11 +104,9 @@ process_image_pliman <- function(image_file, out_folder,
     show_image = show
   )
   
-  
   return(bind_cols(results, as_tibble(disease_assessment$severity)))
-  
-}
 
+}
 
 bioassay_test <- list.files("bioassay_test/test/", ".JPG", full.names = TRUE)
 
@@ -129,11 +130,6 @@ with_progress({
     }) 
 })
 toc()
-
-
-
-avg_bgcolor("input_images/T001_POT43_PL1_00002_cropped.jpg")
-
 
 # Tests ####
 
