@@ -1,5 +1,7 @@
 # TODO
 # Read in phenotyping data from SharePoint and attach isolate and host information for each pot
+# implement gravity in avg_bgcolor
+# combine duplicate values in phenotyping data 
 
 # install/load packages in one-liner
 library(pacman)
@@ -8,118 +10,40 @@ p_load_gh(char = c("TiagoOlivoto/pliman",
                            "DavisVaughan/furrr", 
                            "HenrikBengtsson/progressr" ))
 # load/install from CRAN/BioConductor
-p_load(tidyverse, magick, tictoc, EBImage)
+p_load(tidyverse, magick, tictoc, EBImage, Microsoft365R, janitor, ISOweek)
 h <- image_import("./palette/h.png")
 s <- image_import("./palette/s.png")
 b <- image_import("./palette/b.JPEG")
 
 plan(multisession, workers = future::availableCores()-1 ) # automatically detect available cores
 
+# read phebnotypic data and pivot (1 row per plant)
+discard_cols <- c("ID", "Start time", "Completion time", "Email", "Name", "Comments", "Images")
+phenotyping_data <- readxl::read_excel("bioassay_test/bioassay_phenotyping_test_data.xlsx") %>% 
+  mutate(date = as.Date(`Start time`), week = ISOweek(date)) %>% 
+  select(-one_of(discard_cols)) %>% 
+  pivot_longer(contains("Plant"), names_to = "Trait", values_to = "Score") %>% 
+  mutate(plant = sub(pattern= "Plant ", "", x = str_extract(Trait, "Plant \\d")), 
+         Trait = sub(pattern= "\\s*Plant \\d\\s*", "", Trait)) %>%
+  pivot_wider(names_from = Trait, values_from = Score) %>% 
+  rename(pot = `Pot #`, bioassay = `Bioassay ID`)
+
+
 # PLIMAN ####
-test <- image_import("input_images/test4.JPG")
+# test <- image_import("input_images/test4.JPG")
 # image_combine(test, h, s, b)
 
-# get avg bg color ####
-# get average colour for transparent reference colour argument
-avg_bgcolor <- function(image_file, ref_area="200x200+0"){
-  if (!grepl("\\d+x\\d+(\\+\\d+){0,2}$", ref_area)) stop(sprintf("The string provided to avg_bgcolor(), '%s', in not a valid Magick crop geometry, see details in https://docs.ropensci.org/magick/reference/geometry.html", ref_area))
-  # image_file="input_images/test4.JPG"
-  sample <- image_read(image_file)
-  crop <- magick::image_crop(sample, ref_area) 
-  crop_array <- as.integer(crop[[1]]) # no need to write to disk and read again, it's very inefficient, see https://stackoverflow.com/a/46736582/5346827
-  # dim(crop_array)
-  red <- mean(crop_array[,,1]) # mean of all red colour channels
-  green <- mean(crop_array[,,2]) # mean of all green colour channels
-  blue <- mean(crop_array[,,3]) # mean of all blue colour channels
-  
-  return(rgb(red, green, blue, maxColorValue = 255))
-  
-}
-
-# test function
-avg_bgcolor("./input_images/T001_POT22_PL5_00002_cropped.jpg")
-
-# pliman measure disease ####
-process_image_pliman <- function(image_file, out_folder, 
-                                 assess_disease=TRUE,
-                                 trim_bottom=375, trim_top=0,  # crop dimensions 
-                                 trim_left=400, trim_right=350,  # crop dimensions
-                                 crop = TRUE, # crop image?
-                                 save_cropped = TRUE, # save cropped image?
-                                 trans = TRUE, # remove background? if yes we must save to a file!
-                                 show=FALSE,   # show image?
-                                 h_pal, s_pal, b_pal,
-                                 bg_color="transparent", 
-                                 reference="200x200+0", # a hex code or a valid Magick::Geometry string
-                                 set_fuzz=30, 
-                                 start_point="+20+20"){
-  original_file <- image_file
-
-  # image cropping
-  if (isTRUE(crop)) {
-    plant_image <- image_import(image_file)
-    processed_image <- pliman::image_trim(image = plant_image,
-                                        bottom = trim_bottom,
-                                        top = trim_top,
-                                        left = trim_left,
-                                        right = trim_right,
-                                        plot = show) 
-    image_basename <- tools::file_path_sans_ext(basename(image_file))
-    
-    # save cropped file to file
-    if (isTRUE(save_cropped) | isTRUE(trans)) {
-      if (!dir.exists(out_folder)) dir.create(out_folder) # create output folder if not exists
-      # Reset image filename to the cropped one if we cropped
-      image_file <- file.path(out_folder, paste0(image_basename, "_cropped.jpg"))
-      pliman::image_export(processed_image, image_file)
-    }
-      
-       
-    
-  }
-  if (isTRUE(trans)) {
-    if (!dir.exists(out_folder)) dir.create(out_folder)
-    image_base <- tools::file_path_sans_ext(basename(image_file))
-    input_img <- image_read(image_file)
-    # calculate reference background colour (if defined as region)
-    if (!grepl("^#\\w{6}", reference)) {
-    }  reference <- avg_bgcolor(image_file = image_file, ref_area = reference)
-    # Reset image filename to the transparent one (must be png to be transparent!)
-    image_file <- file.path(out_folder, paste0(image_base, "_transparent.png"))
-    magick::image_fill(input_img, 
-                       color = bg_color,
-                       refcolor = reference,
-                       fuzz = set_fuzz,
-                       point = start_point) %>% 
-      image_write(image_file, format = 'png') # (must be png to be transparent!)
-
-  }  
-  # save results as a row in a tibble
-  results <- tibble(original_file=original_file, processed_file=ifelse(original_file==image_file, NA, image_file), 
-                    cropped=crop, save_cropped = save_cropped,  remove_bg=trans, disease_assessed=assess_disease)
-  
-  if (!isTRUE(assess_disease)) return(results) # exit the function if disease assessment is not needed
-  # pliman measure disease #
-  if (!exists("processed_image")) processed_image <- image_import(image_file)
-  disease_assessment <- measure_disease(
-    img = processed_image,
-    img_healthy = h_pal,
-    img_symptoms = s_pal,
-    img_background = b_pal,
-    show_image = show
-  )
-  
-  return(bind_cols(results, as_tibble(disease_assessment$severity)))
-
-}
+source("src/functions.R")
 
 # Tests ####
 
 # run the function for 1 image (only cropping)
-process_image_pliman(image_file = "./input_images/test4.JPG", 
+process_image_pliman(image_file = "../../Image Capture/20220429_Phenotyping/B001_POT13_PL1_00002.JPG", 
                      out_folder = "output/processed_images", 
                      assess_disease = FALSE,
                      trans = FALSE,
+                     trim_bottom=230, trim_top=0,  # crop dimensions 
+                     trim_left=0, trim_right=400,
                      h_pal = h, s_pal = s, b_pal = b)
 
 # run the function for 1 image (only cropping, no saving file)
@@ -137,6 +61,7 @@ process_image_pliman(image_file = "./input_images/test4.JPG",
                      save_cropped = FALSE,
                      trans = FALSE,
                      h_pal = h, s_pal = s, b_pal = b)
+
 # run the function for 1 image (just removing background)
 process_image_pliman(image_file = "./input_images/test4.JPG", 
                      out_folder = "output/processed_images", 
@@ -183,9 +108,46 @@ process_image_pliman(image_file = "./input_images/test4.JPG",
                      h_pal = h, s_pal = s, b_pal = b)
 
 
+
+
 # run the function for 5 images in folder
 
-bioassay_test <- list.files("bioassay_test/test/", ".JPG", full.names = TRUE)
+# test crop area and transparent bg ####
+
+# crop only on one image
+process_image_pliman(image_file = "../../Image Capture/20220429_Phenotyping/B001_POT13_PL1_00002.JPG",
+                      out_folder = "output/processed_images",
+                      assess_disease = FALSE,
+                      trans = FALSE,
+                      trim_bottom=230, trim_top=0,  # crop dimensions
+                      trim_left=0, trim_right=400,
+                      h_pal = h, s_pal = s, b_pal = b)
+# find average colour (from NE corner this time)
+avg_bgcolor("./output/processed_images/B001_POT13_PL1_00002_cropped.jpg", "200x200+5300+100" ) #DAD1C8
+
+# just removing bg for 1 image
+
+process_image_pliman(image_file = "./output/processed_images/B001_POT13_PL1_00002_cropped.jpg", 
+                     out_folder = "output/processed_images", 
+                     assess_disease = FALSE,
+                     crop = FALSE, 
+                     save_cropped = FALSE,
+                     trans = TRUE,
+                     set_fuzz = 18,
+                     reference = "#DAD1C8",
+                     start_point = "+5400+3500",
+                     h_pal = h, s_pal = s, b_pal = b)
+
+bioassay_test <- list.files("../../Image Capture/20220429_Phenotyping", "B001_POT13_.+.JPG", full.names = TRUE)
+
+bioassay_files <- tibble(original_file = list.files("../../Image Capture/20220429_Phenotyping", "B001_POT.+.JPG", full.names = TRUE)) %>% 
+  mutate(meta_string=tools::file_path_sans_ext(basename(original_file))) %>% 
+  separate(meta_string, into = c("bioassay", "pot", "plant", "replicate")) %>% 
+  mutate(pot=as.integer(sub("POT", "", pot, ignore.case = TRUE)), plant=sub("PL", "", plant, ignore.case = TRUE))
+
+# subset a range of pots (figure our cropping region)
+bioassay_test <- bioassay_files %>% filter(pot<60) %>% .$original_file
+# for this set the crop parameters are: trim_bottom=230, trim_top=0,  trim_left=0, trim_right=400
 
 tic() # start timer
 with_progress({
@@ -193,21 +155,76 @@ with_progress({
   disease_assessment_table <- bioassay_test %>% 
     future_map_dfr(.f = ~{
       res_tibble <- process_image_pliman(image_file = .x, 
-                                         out_folder = "bioassay_test/output/", 
+                                         out_folder = "../../Image Capture/20220429_Phenotyping/processed_images", 
                                          assess_disease = TRUE,
                                          crop = TRUE, 
-                                         trim_bottom=300, trim_top=0,
-                                         trim_left=400, trim_right=275,
+                                         trim_bottom=230, trim_top=0,
+                                         trim_left=0, trim_right=400,
                                          save_cropped = TRUE,
                                          trans = TRUE,
-                                         set_fuzz = 28,
-                                         reference="200x200+0",
+                                         set_fuzz = 18,
+                                         reference="#DAD1C8",
+                                         start_point = "+5400+3500",
                                          h_pal = h, s_pal = s, b_pal = b)
       p() # because we put this last in the future_map_dfr, the function returned the progressor step instead of the tibble!
       return(res_tibble) # this should fix it...
     }, .options = furrr_options(seed = TRUE)) # this removes the annoying warning about the seed (though I don'tthink we're generating any random numbers)
 })
 toc()
+
+
+
+# process disease assessment results ####
+image_disease_data <- disease_assessment_table %>% # check results and extract metadata from filename
+  mutate(meta_string=tools::file_path_sans_ext(basename(original_file))) %>% 
+  separate(meta_string, into = c("bioassay", "pot", "plant", "replicate")) %>% 
+  mutate(pot=sub("POT", "", pot, ignore.case = TRUE), plant=sub("PL", "", plant, ignore.case = TRUE)) %>% 
+  group_by(bioassay, pot, plant) %>% 
+  summarise(symptomatic_mean = mean(symptomatic, na.rm = TRUE), assessment_SD=sd(symptomatic, na.rm = TRUE), 
+            image_num=n()) %>% 
+  left_join(phenotyping_data ) %>% relocate(date, week, .before = 1) %>% 
+  write_csv("output/B001_POT13-59_data.csv")
+
+# repeat for second subset ####
+# subset a range of pots (f60-100, igure our cropping region)
+bioassay_test <- bioassay_files %>% filter(between(pot, 60, 100)) %>% .$original_file
+# for this set the crop parameters are: trim_bottom=230, trim_top=0,  trim_left=0, trim_right=400
+
+tic() # start timer
+with_progress({
+  p <- progressor(steps = length(bioassay_test)) # 
+  disease_assessment_table <- bioassay_test %>% 
+    future_map_dfr(.f = ~{
+      res_tibble <- process_image_pliman(image_file = .x, 
+                                         out_folder = "../../Image Capture/20220429_Phenotyping/processed_images", 
+                                         assess_disease = TRUE,
+                                         crop = TRUE, 
+                                         trim_bottom=230, trim_top=0,
+                                         trim_left=0, trim_right=400,
+                                         save_cropped = TRUE,
+                                         trans = TRUE,
+                                         set_fuzz = 18,
+                                         reference="#DAD1C8",
+                                         start_point = "+5400+3500",
+                                         h_pal = h, s_pal = s, b_pal = b)
+      p() # because we put this last in the future_map_dfr, the function returned the progressor step instead of the tibble!
+      return(res_tibble) # this should fix it...
+    }, .options = furrr_options(seed = TRUE)) # this removes the annoying warning about the seed (though I don'tthink we're generating any random numbers)
+})
+toc()
+
+
+
+# process disease assessment results ####
+image_disease_data <- disease_assessment_table %>% # check results and extract metadata from filename
+  mutate(meta_string=tools::file_path_sans_ext(basename(original_file))) %>% 
+  separate(meta_string, into = c("bioassay", "pot", "plant", "replicate")) %>% 
+  mutate(pot=sub("POT", "", pot, ignore.case = TRUE), plant=sub("PL", "", plant, ignore.case = TRUE)) %>% 
+  group_by(bioassay, pot, plant) %>% 
+  summarise(symptomatic_mean = mean(symptomatic, na.rm = TRUE), assessment_SD=sd(symptomatic, na.rm = TRUE), 
+            image_num=n()) %>% 
+  left_join(phenotyping_data ) %>% relocate(date, week, .before = 1) %>% 
+  write_csv("output/B001_POT60-100_data.csv")
 
 # 73 sec
 
@@ -222,11 +239,34 @@ toc()
 # toc()
 # 132 sec
 
-# process disease assessment results ####
-disease_assessment_table %>% # check results and extract metadata from filename
-  mutate(meta_string=tools::file_path_sans_ext(basename(original_file))) %>% 
-  separate(meta_string, into = c("bioassay", "pot", "plant", "replicate")) %>% 
-  mutate(pot=as.integer(sub("POT", "", pot, ignore.case = TRUE)), plant=as.integer(sub("PL", "", plant, ignore.case = TRUE)))
+
+
+# read phenotyping data from SharePoint
+
+# setup access to SharePoint
+# after password change - clear cache and restart R session (or computer if needed)
+# AzureAuth::clean_token_directory()
+# AzureGraph::delete_graph_login(tenant="common")
+# options(microsoft365r_use_cli_app_id=TRUE)
+# 
+# list_sharepoint_sites()
+# site <- get_sharepoint_site("GRDC A. rabiei Project GRI2007-001RTX") #,
+# # app="04b07795-8ddb-461a-bbee-02f9e1bf7b46" , auth_type="device_code"
+# #,tenant = "common")
+# # Microsoft365R::list_sharepoint_sites()                            
+# 
+# # app="04b07795-8ddb-461a-bbee-02f9e1bf7b46")
+# 
+# 
+# # app="04b07795-8ddb-461a-bbee-02f9e1bf7b46")
+# # default document library
+# drv <- site$get_drive()
+# 
+# # a drive has the same methods as for OneDrive above
+# # drv$list_items()
+# drv$download_file("Ascochyta rabiei phenotyping (by pot).xlsx",
+#                   dest = "data/Ascochyta_rabiei_phenotyping_form_data.xlsx",
+#                   overwrite = TRUE)
 
 
 
