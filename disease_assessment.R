@@ -4,11 +4,11 @@
 # install/load packages in one-liner
 library(pacman)
 # load/install from GitHub repos
-p_load_current_gh(char = c("TiagoOlivoto/pliman", 
+p_load_gh(char = c("TiagoOlivoto/pliman", 
                            "DavisVaughan/furrr", 
                            "HenrikBengtsson/progressr" ))
 # load/install from CRAN/BioConductor
-p_load(tidyverse, magick, tictoc, jpeg, EBImage)
+p_load(tidyverse, magick, tictoc, EBImage)
 h <- image_import("./palette/h.png")
 s <- image_import("./palette/s.png")
 b <- image_import("./palette/b.JPEG")
@@ -22,6 +22,7 @@ test <- image_import("input_images/test4.JPG")
 # get avg bg color ####
 # get average colour for transparent reference colour argument
 avg_bgcolor <- function(image_file, ref_area="200x200+0"){
+  if (!grepl("\\d+x\\d+(\\+\\d+){0,2}$", ref_area)) stop(sprintf("The string provided to avg_bgcolor(), '%s', in not a valid Magick crop geometry, see details in https://docs.ropensci.org/magick/reference/geometry.html", ref_area))
   # image_file="input_images/test4.JPG"
   sample <- image_read(image_file)
   crop <- magick::image_crop(sample, ref_area) 
@@ -49,7 +50,7 @@ process_image_pliman <- function(image_file, out_folder,
                                  show=FALSE,   # show image?
                                  h_pal, s_pal, b_pal,
                                  bg_color="transparent", 
-                                 reference="200x200+0", 
+                                 reference="200x200+0", # a hex code or a valid Magick::Geometry string
                                  set_fuzz=30, 
                                  start_point="+20+20"){
   original_file <- image_file
@@ -81,7 +82,8 @@ process_image_pliman <- function(image_file, out_folder,
     image_base <- tools::file_path_sans_ext(basename(image_file))
     input_img <- image_read(image_file)
     # calculate reference background colour (if defined as region)
-    if (!grepl("^#\\w{6}", reference)) reference <- avg_bgcolor(image_file = image_file, ref_area = reference)
+    if (!grepl("^#\\w{6}", reference)) {
+    }  reference <- avg_bgcolor(image_file = image_file, ref_area = reference)
     # Reset image filename to the transparent one (must be png to be transparent!)
     image_file <- file.path(out_folder, paste0(image_base, "_transparent.png"))
     magick::image_fill(input_img, 
