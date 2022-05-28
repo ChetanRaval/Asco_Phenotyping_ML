@@ -1,7 +1,7 @@
 # TODO
 # Read in phenotyping data from SharePoint and attach isolate and host information for each pot
 # implement gravity in avg_bgcolor
-# combine duplicate values in phenotyping data 
+# combine duplicate values in phenotyping data - done!
 
 # load functions from Ido's gist
 devtools::source_gist("7f63547158ecdbacf31b54a58af0d1cc", filename = "util.R")
@@ -20,16 +20,48 @@ b <- image_import("./palette/b.JPEG")
 
 plan(multisession, workers = future::availableCores()-2 ) # automatically detect available cores
 
-# read phebnotypic data and pivot (1 row per plant)
+# read phenotypic data and pivot (1 row per plant)
+# read phenotyping data from SharePoint
+
+# setup access to SharePoint
+# after password change - clear cache and restart R session (or computer if needed)
+# AzureAuth::clean_token_directory()
+# AzureGraph::delete_graph_login(tenant="common")
+options(microsoft365r_use_cli_app_id=TRUE)
+
+# list_sharepoint_sites()
+site <- get_sharepoint_site("GRDC A. rabiei Project GRI2007-001RTX") #,
+# app="04b07795-8ddb-461a-bbee-02f9e1bf7b46" , auth_type="device_code"
+#,tenant = "common")
+# Microsoft365R::list_sharepoint_sites()
+
+# app="04b07795-8ddb-461a-bbee-02f9e1bf7b46")
+
+
+# app="04b07795-8ddb-461a-bbee-02f9e1bf7b46")
+# default document library
+drv <- site$get_drive()
+
+# a drive has the same methods as for OneDrive above
+# drv$list_items()
+drv$download_file("Ascochyta rabiei phenotyping (blind design) (2).xlsx",
+                  dest = "bioassay_test/Ascochyta_rabiei_phenotyping_form_data.xlsx",
+                  overwrite = TRUE)
+
+
 discard_cols <- c("ID", "Start time", "Completion time", "Email", "Name", "Comments", "Images")
-phenotyping_data <- readxl::read_excel("bioassay_test/bioassay_phenotyping_test_data.xlsx") %>% 
+phenotyping_data <- readxl::read_excel("bioassay_test/Ascochyta_rabiei_phenotyping_form_data.xlsx") %>% 
   mutate(date = as.Date(`Start time`), week = ISOweek(date)) %>% 
   select(-one_of(discard_cols)) %>% 
   pivot_longer(contains("Plant"), names_to = "Trait", values_to = "Score") %>% 
   mutate(plant = sub(pattern= "Plant ", "", x = str_extract(Trait, "Plant \\d")), 
-         Trait = sub(pattern= "\\s*Plant \\d\\s*", "", Trait)) %>%
-  pivot_wider(names_from = Trait, values_from = Score) %>% 
-  rename(pot = `Pot #`, bioassay = `Bioassay ID`)
+         Trait = sub(pattern= "\\s*Plant \\d\\s*", "", Trait),
+         Score = as.numeric(Score)) %>%
+  clean_names() %>% 
+  group_by(bioassay_id, date, pot_number, trait, plant) %>% 
+  summarise(score = mean(score, na.rm = TRUE)) %>% 
+  pivot_wider(names_from = trait, values_from = score) %>% 
+  rename(bioassay = bioassay_id, pot=pot_number)
 
 
 # PLIMAN ####
@@ -195,9 +227,10 @@ combined_results_df <- map_dfr(combined_disease_assessment_results, bind_rows) %
   separate(meta_string, into = c("bioassay", "pot", "plant", "replicate")) %>% 
   mutate(pot=sub("POT", "", pot, ignore.case = TRUE), plant=sub("PL", "", plant, ignore.case = TRUE)) %>% 
   group_by(bioassay, pot, plant) %>% 
-  summarise(symptomatic_mean = mean(symptomatic, na.rm = TRUE), assessment_SD=sd(symptomatic, na.rm = TRUE), 
+  summarise(symptomatic_mean = mean(symptomatic, na.rm = TRUE), 
+            assessment_SD=sd(symptomatic, na.rm = TRUE), 
             image_num=n()) %>% 
-  left_join(phenotyping_data ) %>% relocate(date, week, .before = 1) %>% 
+  left_join(phenotyping_data) %>% relocate(date, .before = 1) %>% 
   write_csv("output/0220429_Phenotyping_processed_data.csv")
 
 
@@ -443,35 +476,6 @@ with_progress({
 toc()
 
 
-
-
-
-# read phenotyping data from SharePoint
-
-# setup access to SharePoint
-# after password change - clear cache and restart R session (or computer if needed)
-# AzureAuth::clean_token_directory()
-# AzureGraph::delete_graph_login(tenant="common")
-# options(microsoft365r_use_cli_app_id=TRUE)
-# 
-# list_sharepoint_sites()
-# site <- get_sharepoint_site("GRDC A. rabiei Project GRI2007-001RTX") #,
-# # app="04b07795-8ddb-461a-bbee-02f9e1bf7b46" , auth_type="device_code"
-# #,tenant = "common")
-# # Microsoft365R::list_sharepoint_sites()                            
-# 
-# # app="04b07795-8ddb-461a-bbee-02f9e1bf7b46")
-# 
-# 
-# # app="04b07795-8ddb-461a-bbee-02f9e1bf7b46")
-# # default document library
-# drv <- site$get_drive()
-# 
-# # a drive has the same methods as for OneDrive above
-# # drv$list_items()
-# drv$download_file("Ascochyta rabiei phenotyping (by pot).xlsx",
-#                   dest = "data/Ascochyta_rabiei_phenotyping_form_data.xlsx",
-#                   overwrite = TRUE)
 
 
 
