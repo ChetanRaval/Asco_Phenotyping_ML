@@ -1,5 +1,5 @@
 # TODO
-# Read in phenotyping data from SharePoint and attach isolate and host information for each pot
+# Read in phenotyping data from SharePoint and attach isolate and host information for each pot - done!
 # implement gravity in avg_bgcolor
 # combine duplicate values in phenotyping data - done!
 
@@ -10,8 +10,8 @@ devtools::source_gist("7f63547158ecdbacf31b54a58af0d1cc", filename = "util.R")
 library(pacman)
 # load/install from GitHub repos
 p_load_gh(char = c("TiagoOlivoto/pliman", 
-                           "DavisVaughan/furrr", 
-                           "HenrikBengtsson/progressr" ))
+                   "DavisVaughan/furrr", 
+                   "HenrikBengtsson/progressr"))
 # load/install from CRAN/BioConductor
 p_load(tidyverse, magick, tictoc, EBImage, Microsoft365R, janitor, ISOweek)
 h <- image_import("./palette/h.png")
