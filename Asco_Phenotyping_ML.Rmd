@@ -54,7 +54,7 @@ fontFmt = function(x,font="consolas"){
 
 *Ascochyta rabiei* is a necrotrophic fungus, causing the Ascochyta blight disease on chickpea, a disease that can cause substantial damage to crops and reduce yield and profits. The disease poses a major risk to the chickpea industry in Australia and worldwide and therefore significant efforts are invested to better understand and monitor the population of *A. rabiei* and identify the most aggressive isolates that are then used to screen breeding material to develop more resistant (or less susceptible) varieties.
 
-The aggressiveness level of *A. rabiei* is determined by assessing the disease symptoms on a differential set of host chickpea varieties/genotypes, in a process that is termed "phenotyping". The Plant Pathology team at the Sustainable Food Production group at Griffith University (led by [Prof Rebecca Ford](https://experts.griffith.edu.au/18969-rebecca-ford) and [Dr Ido Bar](https://experts.griffith.edu.au/8327-ido-bar)) are preforming those assessments annually on a collection of *A. rabiei* isolates collected from the chickpea growing regions in Australia each year. The assessment is performed on 5 weeks old chickpea seedlings that have been inoculated with *A. rabiei* isolates and grown in controlled environment conditions that are conducive for the fungus to establish itself and cause disease on the plants. The exact phenotyping methods are described in [@sambasivamEvidenceRecentIncreased2020; @mehmoodEvidenceConsequenceHighly2017]
+The aggressiveness level of *A. rabiei* is determined by assessing the disease symptoms on a differential set of host chickpea varieties/genotypes, in a process that is termed "phenotyping". The Plant Pathology team at the Sustainable Food Production group at Griffith University (led by [Prof Rebecca Ford](https://experts.griffith.edu.au/18969-rebecca-ford) and [Dr Ido Bar](https://experts.griffith.edu.au/8327-ido-bar)) are preforming those assessments annually on a collection of *A. rabiei* isolates collected from the chickpea growing regions in Australia each year. The assessment is performed on 5 weeks old chickpea seedlings that have been inoculated with *A. rabiei* isolates and grown in controlled environment conditions that are conducive for the fungus to establish itself and cause disease on the plants. The exact phenotyping methods are described in [@sambasivamEvidenceRecentIncreased2020; @mehmoodEvidenceConsequenceHighly2017].
 
 ### Aims
 
@@ -342,8 +342,6 @@ ggpairs(cor_data)
 
 ```
 
-
-
 ```{r cor-matrix, fig.cap="Correlations matrix of image-based and visual pathology disease assessment methods for _A. rabiei_"}
 # Check correlation between all traits 
 # plot correlation matrix
@@ -355,7 +353,7 @@ ggcorrmat(
 
 ```
 
-A more focused view of the correlation between the visual pathology assessment and the image-based assessment performed by `r fontFmt("ggstatsplot, GGally, ggcorrplot")` can be seen in Figure \@ref(fig:lad-pliman-cor). 
+A more focused view of the correlation between the visual pathology assessment and the image-based assessment performed by `r fontFmt("ggstatsplot")` can be seen in Figure \@ref(fig:lad-pliman-cor).
 
 ```{r lad-pliman-cor, fig.cap="Correlation between image-based and visual pathology disease assessment methods for _A. rabiei_"}
 pale_theme <- ggthemr(palette = "pale", set_theme = FALSE, text_size = 14)
@@ -376,7 +374,7 @@ ggscatterstats(
 
 ## Conclusion
 
-Overall `r sum(processed_data$image_num)` images of diseased plants were processed, representing `r nrow(processed_data)` plants (`r length(unique(processed_data$pot))` pots of 35 isolate-host combinations). We observed moderate-high correlation ($R^2=0.65$) between the image-based disease assessment and the visual pathology assessment. The correlation between the qualitative stem and leaf disease scores and visual assessment of diseased leaf area (LAD %) was significantly better than the image-based computed assessment, indicating that there are still further improvements to be achieved to increase the accuracy of the model. However, the results are promising and demonstrate the advantages of image-based assessments, which are faster, do not require expert pathologists (therefore cheaper) and are not subjective, hence less biased by the individual assessor's skills, knowledge, mental state, fatigue, etc. 
+Overall `r sum(processed_data$image_num)` images of diseased plants were processed, representing `r nrow(processed_data)` plants (`r length(unique(processed_data$pot))` pots of 35 isolate-host combinations). We observed moderate-high correlation ($R^2=0.65$) between the image-based disease assessment and the visual pathology assessment. The correlation between the qualitative stem and leaf disease scores and visual assessment of diseased leaf area (LAD %) was significantly better than the image-based computed assessment, indicating that there are still further improvements to be achieved to increase the accuracy of the model. However, the results are promising and demonstrate the advantages of image-based assessments, which are faster, do not require expert pathologists (therefore cheaper) and are not subjective, hence less biased by the individual assessor's skills, knowledge, mental state, fatigue, etc.
 
 ## General information
 
