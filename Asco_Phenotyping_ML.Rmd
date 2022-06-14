@@ -1,6 +1,6 @@
 ---
 title: "Assessment of *Ascochyta rabiei* Disease Symptoms Using Machine Learning Image Analysis"
-author: "Chetan Reval and Ido Bar"
+author: "Chetan Raval and Ido Bar"
 date: "09 June 2022"
 output: 
     bookdown::html_document2:
@@ -58,7 +58,7 @@ The aggressiveness level of *A. rabiei* is determined by assessing the disease s
 
 ### Aims
 
--   Review machine-learning methods and approaches that can be applied to automatically assess disease symptoms from captured imaged
+-   Review machine-learning methods and approaches that can be applied to automatically assess disease symptoms from captured images
 -   Apply and optimise selected methods and assess their accuracy, efficiency and correlation with traditional plant pathology visual assessment method
 
 ## Methods
@@ -76,7 +76,7 @@ knitr::include_graphics("input_images/infected_plant_in pot.jpg")
 
 ### Image Capture
 
-An imaging light box ([Neewer Upgraded Photo Light Box, 40x40x40 cm](https://www.amazon.com.au/gp/product/B0921MD235)) with a camera tripod ([Neewer Camera Tripod Monopod with Rotatable Center Column](https://www.amazon.com.au/gp/product/B0734ZZN61)) and a Sony digital camera (**add model here**) that was mounted and operated remotely using XXXX software, were used to capture images of the diseased plants (see setup in Figure \@ref(fig:image-capture-setup)). Each plant was laid flat in the imaging box and captured by at least 2 images to represent both sides prior to the visual pathology assessment.
+An imaging light box ([Neewer Upgraded Photo Light Box, 40x40x40 cm](https://www.amazon.com.au/gp/product/B0921MD235)) with a camera tripod ([Neewer Camera Tripod Monopod with Rotatable Center Column](https://www.amazon.com.au/gp/product/B0734ZZN61)) and a Sony digital camera ([Sony A7III](https://www.sony.com.au/electronics/interchangeable-lens-cameras/ilce-7m3)) that was mounted and operated remotely using Sony's Imaging Edge software, were used to capture images of the diseased plants (see setup in Figure \@ref(fig:image-capture-setup)). Each plant was laid flat in the imaging box and captured by at least 2 images to represent both sides prior to the visual pathology assessment.
 
 ```{r image-capture-setup, fig.cap="Image capture setup for disease assessment of *Ascochyta rabiei*", out.width="100%"}
 knitr::include_graphics("input_images/image_capture_setup.jpg")
@@ -146,8 +146,8 @@ process_image_pliman(image_file = "./input_images/test4.JPG",
 ```{r processed-images, fig.cap="Example of the cropping and background removal performed during image processing", out.width="100%"}
 
 cropped_plant <- image_import("output/processed_images/test4_cropped.jpg")
-tran_plant <- image_import("output/processed_images/test4_cropped_transparent.png")
-pliman::image_combine(test_plant, cropped_plant, tran_plant)
+trans_plant <- image_import("output/processed_images/test4_cropped_transparent.png")
+pliman::image_combine(test_plant, cropped_plant, trans_plant)
 ```
 
 After the image processing was validated for one image in a bioassay folder, the rest of the images in the folder were processed in parallel.
