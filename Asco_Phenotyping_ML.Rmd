@@ -239,11 +239,11 @@ This processed was then repeated for all the captured images in the bioassay fol
 
 #### Statistical Analysis and Visualisation
 
-The correlation between the visual phenotyping disease (leaf and stem 1-9 score and area of diseased tissue) and the image-based diseased symptoms assessment was visualised and assessed using the R packages `r fontFmt("ggstatsplot, GGally, ggcorrplot")`, as described in [Correlation coefficient and correlation test in R](https://statsandr.com/blog/correlation-coefficient-and-correlation-test-in-r/) [@antoinesoeteweyCorrelationCoefficientCorrelation2020].
+The correlation between the visual phenotyping disease (leaf and stem 1-9 score and area of diseased tissue) and the image-based diseased symptoms assessment was visualised and assessed using the R packages `r fontFmt("ggstatsplot, ggside, GGally, ggcorrplot")`, as described in [Correlation coefficient and correlation test in R](https://statsandr.com/blog/correlation-coefficient-and-correlation-test-in-r/) [@antoinesoeteweyCorrelationCoefficientCorrelation2020].
 
 ```{r plotting-packages}
 # load/install from CRAN/BioConductor
-p_load(ggstatsplot, GGally, ggcorrplot, scales)
+p_load(ggstatsplot, GGally, ggcorrplot, ggside, scales)
 
 ```
 
