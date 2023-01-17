@@ -175,7 +175,7 @@ process_image_pliman(image_file = "./output/processed_images/B001_POT13_PL1_0000
 
 bioassay_test <- list.files("../../Image Capture/20220429_Phenotyping", "B001_POT13_.+.JPG", full.names = TRUE)
 
-bioassay_files <- tibble(original_file = list.files("../../Image Capture/20220429_Phenotyping", "B001_POT.+.JPG", full.names = TRUE)) %>% 
+bioassay_files <- tibble(original_file = list.files("../20220429_Phenotyping", "B001_POT.+.JPG", full.names = TRUE)) %>%  # "../../Image Capture/20220429_Phenotyping", "B001_POT.+.JPG"
   mutate(meta_string=tools::file_path_sans_ext(basename(original_file))) %>% 
   separate(meta_string, into = c("bioassay", "pot", "plant", "replicate")) %>% 
   mutate(pot=as.integer(sub("POT", "", pot, ignore.case = TRUE)), plant=sub("PL", "", plant, ignore.case = TRUE))
@@ -232,6 +232,21 @@ combined_results_df <- map_dfr(combined_disease_assessment_results, bind_rows) %
             image_num=n()) %>% 
   left_join(phenotyping_data) %>% relocate(date, .before = 1) %>% 
   write_csv("output/0220429_Phenotyping_processed_data.csv")
+
+combined_results_df <- read_csv("output/0220429_Phenotyping_processed_data.csv")
+
+
+bioassay_details <- bioassay_files %>% mutate(plant=as.numeric(plant)) %>% 
+  inner_join(combined_results_df) %>% clean_names()
+# Preparing stem Score folder
+for (i in unique(bioassay_details$stem_score)) {
+  target_folder <- file.path("input_images", "stem_score", i)
+  dir.create(target_folder)
+  temp_table <- bioassay_details %>% filter(stem_score==i)
+  for (j in 1:nrow(temp_table)) {
+    file.copy(temp_table$original_file[j], to = target_folder)
+  }
+}
 
 
 tic() # start timer
